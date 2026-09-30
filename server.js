@@ -32,6 +32,66 @@ app.get("/api/admin/orders", admin, (req, res) => res.json({ orders: db.orders.s
 app.patch("/api/admin/orders/:id", admin, (req, res) => { if (!["pending", "processing", "completed", "cancelled"].includes(req.body.status)) return res.status(400).json({ error: "Trạng thái không hợp lệ." }); const o = db.orders.find(x => x.id === Number(req.params.id)); if (!o) return res.status(404).json({ error: "Không tìm thấy đơn." }); o.status = req.body.status; save(); res.json({ ok: true }) });
 app.get("/api/admin/topups", admin, (req, res) => res.json({ topups: db.topups.sort((a, b) => b.id - a.id).map(({ code, ...t }) => ({ ...t, email: (byId(t.user_id) || {}).email || "" })) }));
 app.patch("/api/admin/topups/:id", admin, (req, res) => { const st = req.body.status; if (!["pending", "approved", "rejected"].includes(st)) return res.status(400).json({ error: "Trạng thái không hợp lệ." }); const t = db.topups.find(x => x.id === Number(req.params.id)); if (!t) return res.status(404).json({ error: "Không tìm thấy giao dịch." }); if (t.status === "approved" && st !== "approved") return res.status(400).json({ error: "Giao dịch đã duyệt, không thể hoàn tác." }); if (st === "approved" && t.status !== "approved") { const u = byId(t.user_id); if (u) u.balance += t.denomination } t.status = st; save(); res.json({ ok: true }) });
+app.get("/api/admin/services", admin, (req, res) => {
+  res.json({ services: db.services.sort((a, b) => a.id - b.id) });
+});
+
+app.post("/api/admin/services", admin, (req, res) => {
+  const game = String(req.body.game || "").trim();
+  const title = String(req.body.title || "").trim();
+  const description = String(req.body.description || "").trim();
+  const eta = String(req.body.eta || "").trim();
+  const price = Number(req.body.price);
+
+  if (!game || !title || !description || !eta || !Number.isFinite(price) || price < 0) {
+    return res.status(400).json({ error: "Vui lòng nhập đầy đủ thông tin dịch vụ và giá hợp lệ." });
+  }
+
+  const service = {
+    id: next(db.services), game, title, description, price, eta,
+    active: req.body.active === false || req.body.active === "0" ? 0 : 1
+  };
+
+  db.services.push(service);
+  save();
+  res.json({ ok: true, service });
+});
+
+app.patch("/api/admin/services/:id", admin, (req, res) => {
+  const service = db.services.find(s => s.id === Number(req.params.id));
+  if (!service) return res.status(404).json({ error: "Không tìm thấy dịch vụ." });
+
+  const game = String(req.body.game ?? service.game).trim();
+  const title = String(req.body.title ?? service.title).trim();
+  const description = String(req.body.description ?? service.description).trim();
+  const eta = String(req.body.eta ?? service.eta).trim();
+  const price = Number(req.body.price ?? service.price);
+
+  if (!game || !title || !description || !eta || !Number.isFinite(price) || price < 0) {
+    return res.status(400).json({ error: "Thông tin dịch vụ không hợp lệ." });
+  }
+
+  service.game = game;
+  service.title = title;
+  service.description = description;
+  service.eta = eta;
+  service.price = price;
+  service.active = req.body.active === false || req.body.active === "0" ? 0 : 1;
+
+  save();
+  res.json({ ok: true, service });
+});
+
+app.delete("/api/admin/services/:id", admin, (req, res) => {
+  const index = db.services.findIndex(s => s.id === Number(req.params.id));
+  if (index === -1) return res.status(404).json({ error: "Không tìm thấy dịch vụ." });
+
+  db.services.splice(index, 1);
+  save();
+  res.json({ ok: true });
+});
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
-}); app.listen(PORT, () => console.log(`Shop running: http://localhost:${PORT}`));
+});app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Shop running on 0.0.0.0:${PORT}`);
+});

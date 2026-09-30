@@ -1,0 +1,9 @@
+Thay dòng cuối server.js:
+
+app.listen(PORT, () => console.log(`Shop running: http://localhost:${PORT}`));
+
+bằng:
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Shop running on 0.0.0.0:${PORT}`);
+});

@@ -1,0 +1,62 @@
+// =========================
+// ADMIN - SERVICES CRUD
+// =========================
+
+app.get("/api/admin/services", admin, (req, res) => {
+  res.json({ services: db.services.sort((a, b) => a.id - b.id) });
+});
+
+app.post("/api/admin/services", admin, (req, res) => {
+  const game = String(req.body.game || "").trim();
+  const title = String(req.body.title || "").trim();
+  const description = String(req.body.description || "").trim();
+  const eta = String(req.body.eta || "").trim();
+  const price = Number(req.body.price);
+
+  if (!game || !title || !description || !eta || !Number.isFinite(price) || price < 0) {
+    return res.status(400).json({ error: "Vui lòng nhập đầy đủ thông tin dịch vụ và giá hợp lệ." });
+  }
+
+  const service = {
+    id: next(db.services), game, title, description, price, eta,
+    active: req.body.active === false || req.body.active === "0" ? 0 : 1
+  };
+
+  db.services.push(service);
+  save();
+  res.json({ ok: true, service });
+});
+
+app.patch("/api/admin/services/:id", admin, (req, res) => {
+  const service = db.services.find(s => s.id === Number(req.params.id));
+  if (!service) return res.status(404).json({ error: "Không tìm thấy dịch vụ." });
+
+  const game = String(req.body.game ?? service.game).trim();
+  const title = String(req.body.title ?? service.title).trim();
+  const description = String(req.body.description ?? service.description).trim();
+  const eta = String(req.body.eta ?? service.eta).trim();
+  const price = Number(req.body.price ?? service.price);
+
+  if (!game || !title || !description || !eta || !Number.isFinite(price) || price < 0) {
+    return res.status(400).json({ error: "Thông tin dịch vụ không hợp lệ." });
+  }
+
+  service.game = game;
+  service.title = title;
+  service.description = description;
+  service.eta = eta;
+  service.price = price;
+  service.active = req.body.active === false || req.body.active === "0" ? 0 : 1;
+
+  save();
+  res.json({ ok: true, service });
+});
+
+app.delete("/api/admin/services/:id", admin, (req, res) => {
+  const index = db.services.findIndex(s => s.id === Number(req.params.id));
+  if (index === -1) return res.status(404).json({ error: "Không tìm thấy dịch vụ." });
+
+  db.services.splice(index, 1);
+  save();
+  res.json({ ok: true });
+});
