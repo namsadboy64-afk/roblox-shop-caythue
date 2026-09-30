@@ -4,41 +4,79 @@
       "id": 1,
       "name": "Nguyễn Tất Kiến Nam",
       "email": "nguyentatkiennam@gmail.com",
-      "password": "$2a$12$FDQRwjbp7plq/WuZJBGzjuIvpqwgqKnLZhjUIkMIz84pF10AFMqpO",
+      "password": "$2a$12$pkzA4GCNlJ8JboUNj9z9teMO2Qs/UMwa27Wfgi9l/1H7SmTdEbm.G",
       "balance": 0,
       "is_admin": 0,
-      "created_at": "2026-09-30T12:29:01.170Z"
+      "created_at": "2026-09-29T09:45:59.070Z"
+    },
+    {
+      "id": 2,
+      "name": "Nam",
+      "email": "nam@gmail.com",
+      "password": "$2a$12$VYVY0i9VJ3kWbzWvXXS7SeSl02TRLarb3G8bBo1UNNl0jKmS9XiZy",
+      "balance": 0,
+      "is_admin": 0,
+      "created_at": "2026-09-29T10:12:01.239Z"
     }
   ],
   "services": [
     {
       "id": 1,
-      "game": "Roblox - Chưa chọn game",
+      "game": "Roblox - Heavyweight Fishing",
       "title": "Cày level cơ bản",
-      "description": "Dịch vụ mẫu. Thay bằng game Roblox cụ thể của bạn.",
-      "price": 50000,
+      "description": "Lv 1 - Lv 500.",
+      "price": 30000,
       "eta": "1-2 ngày",
       "active": 1
     },
     {
       "id": 2,
-      "game": "Roblox - Chưa chọn game",
-      "title": "Cày nhiệm vụ",
-      "description": "Dịch vụ mẫu cho hệ thống. Bạn có thể đổi tên, mô tả và giá.",
-      "price": 70000,
+      "game": "Roblox - Heavyweight Fishing",
+      "title": "Lv 500 - Lv 1000",
+      "description": "Cày level 500 - 1000.",
+      "price": 49000,
       "eta": "1-3 ngày",
       "active": 1
     },
     {
       "id": 3,
-      "game": "Roblox - Chưa chọn game",
-      "title": "Gói cày theo yêu cầu",
-      "description": "Khách gửi yêu cầu riêng để shop báo giá.",
-      "price": 100000,
+      "game": "Roblox - Heavyweight Fishing",
+      "title": "Lv 1000 - Lv 1500",
+      "description": "Cày level 1000 - 1500.",
+      "price": 55000,
+      "eta": "Liên hệ",
+      "active": 1
+    },
+    {
+      "id": 4,
+      "game": "Roblox - Heavyweight Fishing",
+      "title": "Lv 1500 - Lv 2100",
+      "description": "Cày level 1500 - 2100.",
+      "price": 65000,
+      "eta": "Liên hệ",
+      "active": 1
+    }
+        {
+      "id": 3,
+      "game": "Roblox - Heavyweight Fishing",
+      "title": "Lv 1- Lv Max",
+      "description": "Lv 1 - Lv Max.",
+      "price": 80000,
       "eta": "Liên hệ",
       "active": 1
     }
   ],
   "orders": [],
-  "topups": []
+  "topups": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "provider": "Viettel",
+      "denomination": 50000,
+      "serial": "1",
+      "code": "1",
+      "status": "pending",
+      "created_at": "2026-09-29T09:51:35.376Z"
+    }
+  ]
 }
