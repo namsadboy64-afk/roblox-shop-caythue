@@ -98,4 +98,28 @@ app.patch("/api/admin/users/:id",admin,async(req,res)=>{
  save();res.json({ok:true,user:safeUser(u)});
 });
 
-app.use((req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));app.listen(PORT,"0.0.0.0",()=>console.log(`Shop running on 0.0.0.0:${PORT}`));
+app.use((req,res)=>res.sendFile(path.join(__dirname,"public","index.html"))); app.post("/api/setup-admin", (req, res) => {
+  const secret = req.headers["x-setup-secret"];
+
+  if (secret !== process.env.ADMIN_SETUP_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  
+  const email = req.body.email;
+
+  const user = db.users.find(
+    u => u.email.toLowerCase() === email.toLowerCase()
+  );
+
+  if (!user) {
+    return res.status(404).json({ error: "Không tìm thấy tài khoản" });
+  }
+
+  user.is_admin = 1;
+  saveDB();
+
+  res.json({
+    success: true,
+    message: "Tài khoản đã trở thành admin"
+  });
+}); app.listen(PORT,"0.0.0.0",()=>console.log(`Shop running on 0.0.0.0:${PORT}`));
