@@ -1,17 +1,749 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin - RobloxShop</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"><style>body{background:#090b10;color:#f5f7fb;font-family:Inter,system-ui,sans-serif}.card{background:#11151d;border:1px solid #252b36;border-radius:16px}.form-control{background:#0c1017;color:#fff;border-color:#303746}.form-control:focus{background:#0c1017;color:#fff;border-color:#5865f2;box-shadow:0 0 0 .2rem #5865f233}.muted{color:#8c95a5}.service{border-bottom:1px solid #252b36;padding:18px 0}.service:last-child{border:0}.price{font-size:18px;font-weight:800}</style></head><body>
-<nav class="navbar navbar-dark bg-dark border-bottom"><div class="container"><a class="navbar-brand fw-bold" href="/">ROBLOX<span style="color:#7280ff">SHOP</span> ADMIN</a><div><a class="btn btn-outline-light btn-sm" href="/">Trang chủ</a> <button class="btn btn-danger btn-sm" onclick="logout()">Đăng xuất</button></div></div></nav>
-<main class="container py-4"><div id="alert"></div><div class="card p-4 mb-4"><h3>Quản lý dịch vụ cày thuê</h3><p class="muted mb-0">Thêm, sửa, ẩn/hiện hoặc xóa dịch vụ trực tiếp.</p></div>
-<div class="card p-4 mb-4"><h4 id="formTitle">Thêm dịch vụ</h4><input type="hidden" id="id"><div class="row g-3"><div class="col-md-4"><label class="form-label">Game</label><input id="game" class="form-control" placeholder="Blox Fruits"></div><div class="col-md-8"><label class="form-label">Tên dịch vụ</label><input id="title" class="form-control" placeholder="Cày level"></div><div class="col-12"><label class="form-label">Mô tả</label><textarea id="description" class="form-control" rows="3"></textarea></div><div class="col-md-4"><label class="form-label">Giá VNĐ</label><input id="price" type="number" min="0" class="form-control" placeholder="50000"></div><div class="col-md-4"><label class="form-label">Thời gian</label><input id="eta" class="form-control" placeholder="1-2 ngày"></div><div class="col-md-4 d-flex align-items-end"><div class="form-check mb-2"><input id="active" class="form-check-input" type="checkbox" checked><label class="form-check-label">Đang hiển thị</label></div></div></div><div class="mt-3"><button class="btn btn-primary" onclick="saveService()">Lưu</button> <button class="btn btn-secondary" onclick="resetForm()">Nhập mới</button></div></div>
-<div class="card p-4"><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Danh sách dịch vụ</h4><button class="btn btn-outline-light btn-sm" onclick="load()">Làm mới</button></div><div id="list">Đang tải...</div></div></main>
-<script>
-const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));const money=n=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'}).format(Number(n)||0);
-function msg(t,type='success'){alert.innerHTML=`<div class="alert alert-${type}">${esc(t)}</div>`;setTimeout(()=>alert.innerHTML='',3000)}
-async function check(){const r=await fetch('/api/me'),d=await r.json();if(!d.user){location='/login.html';return false}if(!d.user.is_admin){alert('Tài khoản không có quyền admin.');location='/';return false}return true}
-async function load(){const r=await fetch('/api/admin/services'),d=await r.json();if(!r.ok){msg(d.error||'Không tải được dịch vụ.','danger');return}list.innerHTML=d.services.length?d.services.map(s=>`<div class="service"><div class="row g-3 align-items-center"><div class="col-lg-8"><div class="text-primary fw-bold">${esc(s.game)}</div><h5>${esc(s.title)}</h5><div class="muted">${esc(s.description)}</div><div class="mt-2"><span class="price">${money(s.price)}</span> <span class="muted ms-2">${esc(s.eta)}</span> <span class="badge ${Number(s.active)?'text-bg-success':'text-bg-secondary'} ms-2">${Number(s.active)?'Đang hiện':'Đang ẩn'}</span></div></div><div class="col-lg-4 text-lg-end"><button class="btn btn-primary btn-sm" onclick='edit(${JSON.stringify(s)})'>Sửa</button> <button class="btn btn-warning btn-sm" onclick="toggle(${s.id},${Number(s.active)?0:1})">${Number(s.active)?'Ẩn':'Hiện'}</button> <button class="btn btn-danger btn-sm" onclick="del(${s.id})">Xóa</button></div></div></div>`).join(''):'<div class="muted">Chưa có dịch vụ.</div>'}
-function edit(s){id.value=s.id;game.value=s.game;title.value=s.title;description.value=s.description;price.value=s.price;eta.value=s.eta;active.checked=Number(s.active)===1;formTitle.textContent='Sửa dịch vụ #'+s.id;scrollTo({top:0,behavior:'smooth'})}
-function resetForm(){['id','game','title','description','price','eta'].forEach(x=>$(x).value='');active.checked=true;formTitle.textContent='Thêm dịch vụ'}
-async function saveService(){const sid=id.value;const body={game:game.value,title:title.value,description:description.value,price:Number(price.value),eta:eta.value,active:active.checked};const r=await fetch(sid?'/api/admin/services/'+sid:'/api/admin/services',{method:sid?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok){msg(d.error||'Lưu thất bại.','danger');return}msg(sid?'Đã cập nhật dịch vụ.':'Đã thêm dịch vụ.');resetForm();load()}
-async function toggle(sid,a){const r=await fetch('/api/admin/services/'+sid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({active:!!a})}),d=await r.json();if(!r.ok){msg(d.error||'Cập nhật thất bại.','danger');return}msg(a?'Đã hiện dịch vụ.':'Đã ẩn dịch vụ.');load()}
-async function del(sid){if(!confirm('Xóa dịch vụ #'+sid+'?'))return;const r=await fetch('/api/admin/services/'+sid,{method:'DELETE'}),d=await r.json();if(!r.ok){msg(d.error||'Xóa thất bại.','danger');return}msg('Đã xóa dịch vụ.');resetForm();load()}
-async function logout(){await fetch('/api/logout',{method:'POST'});location='/login.html'}(async()=>{if(await check())load()})();
-</script></body></html>
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RobloxShop Admin</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #07090d;
+        --panel: #11151d;
+        --line: #262d39;
+        --muted: #8e97a7;
+        --accent: #7168ff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: #f5f7fb;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .side {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 245px;
+        background: #0b0e14;
+        border-right: 1px solid var(--line);
+        padding: 20px 14px;
+        z-index: 5;
+      }
+      .brand {
+        font-weight: 900;
+        font-size: 21px;
+        padding: 5px 10px 20px;
+      }
+      .brand span {
+        color: #786fff;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .navb {
+        width: 100%;
+        border: 0;
+        background: none;
+        color: #aeb6c5;
+        text-align: left;
+        padding: 11px 13px;
+        border-radius: 10px;
+        margin: 3px 0;
+        font-weight: 700;
+      }
+      .navb:hover,
+      .navb.active {
+        background: #181d27;
+        color: #fff;
+      }
+      .main {
+        margin-left: 245px;
+        padding: 25px;
+        min-height: 100vh;
+      }
+      .cardx {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        padding: 18px;
+      }
+      .stat {
+        min-height: 125px;
+      }
+      .stat .n {
+        font-size: 30px;
+        font-weight: 900;
+        margin-top: 8px;
+      }
+      .table-wrap {
+        overflow: auto;
+      }
+      .table {
+        --bs-table-bg: transparent;
+        --bs-table-color: #eef1f6;
+        --bs-table-border-color: var(--line);
+        white-space: nowrap;
+      }
+      .form-control,
+      .form-select {
+        background: #0c1017;
+        border-color: #303746;
+        color: #fff;
+      }
+      .form-control:focus,
+      .form-select:focus {
+        background: #0c1017;
+        color: #fff;
+        border-color: #7168ff;
+        box-shadow: 0 0 0 0.2rem #7168ff22;
+      }
+      .form-control::placeholder {
+        color: #697282;
+      }
+      .tab {
+        display: none;
+      }
+      .tab.show {
+        display: block;
+      }
+      .money {
+        font-weight: 800;
+      }
+      @media (max-width: 850px) {
+        .side {
+          position: static;
+          width: 100%;
+          height: auto;
+        }
+        .main {
+          margin: 0;
+          padding: 15px;
+        }
+        .menu {
+          display: flex;
+          overflow: auto;
+        }
+        .navb {
+          min-width: max-content;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <aside class="side">
+      <div class="brand">
+        ROBLOX<span>SHOP</span>
+        <div class="muted" style="font-size: 12px">ADMIN DASHBOARD</div>
+      </div>
+      <div class="menu">
+        <button class="navb active" data-tab="dash">📊 Tổng quan</button
+        ><button class="navb" data-tab="svc">🛠️ Dịch vụ</button
+        ><button class="navb" data-tab="ord">📦 Đơn hàng</button
+        ><button class="navb" data-tab="top">💳 Nạp tiền</button
+        ><button class="navb" data-tab="usr">👤 User</button>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="d-flex justify-content-between align-items-center mb-4 gap-2">
+        <div>
+          <h2 class="mb-1">Admin Dashboard</h2>
+          <div class="muted">Quản lý shop cày thuê</div>
+        </div>
+        <div>
+          <a class="btn btn-outline-light" href="/">Trang chủ</a>
+          <button class="btn btn-danger" onclick="logout()">Đăng xuất</button>
+        </div>
+      </div>
+      <div id="alert"></div>
+      <section id="dash" class="tab show">
+        <div class="row g-3">
+          <div class="col-6 col-xl-3">
+            <div class="cardx stat">
+              <div class="muted">Người dùng</div>
+              <div class="n" id="uN">0</div>
+              <div class="muted" id="uS"></div>
+            </div>
+          </div>
+          <div class="col-6 col-xl-3">
+            <div class="cardx stat">
+              <div class="muted">Dịch vụ</div>
+              <div class="n" id="sN">0</div>
+              <div class="muted" id="sS"></div>
+            </div>
+          </div>
+          <div class="col-6 col-xl-3">
+            <div class="cardx stat">
+              <div class="muted">Đơn chờ xử lý</div>
+              <div class="n" id="oN">0</div>
+              <div class="muted" id="oS"></div>
+            </div>
+          </div>
+          <div class="col-6 col-xl-3">
+            <div class="cardx stat">
+              <div class="muted">Nạp tiền chờ duyệt</div>
+              <div class="n" id="tN">0</div>
+              <div class="muted" id="tS"></div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <div class="cardx">
+              <div class="muted">Doanh thu đơn hoàn thành</div>
+              <h2 id="rev" class="mt-2">0 ₫</h2>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="cardx">
+              <div class="muted">Tiền nạp đã duyệt</div>
+              <h2 id="dep" class="mt-2">0 ₫</h2>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="svc" class="tab">
+        <div class="cardx mb-3">
+          <div class="d-flex justify-content-between">
+            <h4 id="svcTitle">Thêm dịch vụ</h4>
+            <button class="btn btn-secondary" onclick="resetSvc()">
+              Nhập mới
+            </button>
+          </div>
+          <input id="sid" type="hidden" />
+          <div class="row g-3 mt-1">
+            <div class="col-md-4">
+              <label>Game</label
+              ><input
+                id="sgame"
+                class="form-control"
+                placeholder="Blox Fruits"
+              />
+            </div>
+            <div class="col-md-8">
+              <label>Tên dịch vụ</label
+              ><input id="stitle" class="form-control" />
+            </div>
+            <div class="col-12">
+              <label>Mô tả</label
+              ><textarea id="sdesc" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="col-md-4">
+              <label>Giá</label
+              ><input id="sprice" type="number" min="0" class="form-control" />
+            </div>
+            <div class="col-md-4">
+              <label>Thời gian</label
+              ><input id="seta" class="form-control" placeholder="1-2 ngày" />
+            </div>
+            <div class="col-md-4 pt-4">
+              <label
+                ><input id="sactive" type="checkbox" checked /> Hiển thị</label
+              >
+            </div>
+          </div>
+          <button class="btn btn-primary mt-3" onclick="saveSvc()">
+            Lưu dịch vụ
+          </button>
+        </div>
+        <div class="cardx">
+          <div class="d-flex justify-content-between">
+            <h4>Danh sách dịch vụ</h4>
+            <button class="btn btn-outline-light btn-sm" onclick="loadSvc()">
+              Làm mới
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Game</th>
+                  <th>Dịch vụ</th>
+                  <th>Giá</th>
+                  <th>ETA</th>
+                  <th>Trạng thái</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="svcBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section id="ord" class="tab">
+        <div class="cardx">
+          <div class="d-flex justify-content-between">
+            <h4>Đơn hàng</h4>
+            <button class="btn btn-outline-light btn-sm" onclick="loadOrd()">
+              Làm mới
+            </button>
+          </div>
+          <input
+            id="oq"
+            class="form-control my-3"
+            placeholder="Tìm ID, email, tên, game..."
+            oninput="renderOrd()"
+          />
+          <div class="table-wrap">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Khách</th>
+                  <th>Dịch vụ</th>
+                  <th>Tài khoản</th>
+                  <th>Giá</th>
+                  <th>Ngày</th>
+                  <th>Trạng thái</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="ordBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section id="top" class="tab">
+        <div class="cardx">
+          <div class="d-flex justify-content-between">
+            <h4>Duyệt nạp tiền</h4>
+            <button class="btn btn-outline-light btn-sm" onclick="loadTop()">
+              Làm mới
+            </button>
+          </div>
+          <input
+            id="tq"
+            class="form-control my-3"
+            placeholder="Tìm ID, email, serial..."
+            oninput="renderTop()"
+          />
+          <div class="table-wrap">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Khách</th>
+                  <th>Nhà mạng</th>
+                  <th>Mệnh giá</th>
+                  <th>Serial</th>
+                  <th>Mã thẻ</th>
+                  <th>Ngày</th>
+                  <th>Trạng thái</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="topBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section id="usr" class="tab">
+        <div class="cardx">
+          <div class="d-flex justify-content-between">
+            <h4>Người dùng</h4>
+            <button class="btn btn-outline-light btn-sm" onclick="loadUsr()">
+              Làm mới
+            </button>
+          </div>
+          <input
+            id="uq"
+            class="form-control my-3"
+            placeholder="Tìm tên hoặc email..."
+            oninput="renderUsr()"
+          />
+          <div class="table-wrap">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>User</th>
+                  <th>Số dư</th>
+                  <th>Đơn</th>
+                  <th>Nạp</th>
+                  <th>Quyền</th>
+                  <th>Trạng thái</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="usrBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+    <div class="modal fade" id="um" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header">
+            <h5>Sửa user</h5>
+            <button
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <input id="uid" type="hidden" /><label>Tên</label
+            ><input id="uname" class="form-control mb-3" /><label>Số dư</label
+            ><input
+              id="ubalance"
+              type="number"
+              min="0"
+              class="form-control mb-3"
+            /><label>Mật khẩu mới</label
+            ><input
+              id="upass"
+              type="password"
+              class="form-control mb-3"
+            /><label><input id="uactive" type="checkbox" /> Hoạt động</label
+            ><br /><label><input id="uadmin" type="checkbox" /> Admin</label>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">
+              Hủy</button
+            ><button class="btn btn-primary" onclick="saveUsr()">Lưu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const $ = (x) => document.getElementById(x),
+        money = (n) =>
+          new Intl.NumberFormat("vi-VN", {
+            style: "currency",
+            currency: "VND",
+          }).format(Number(n) || 0),
+        esc = (s) =>
+          String(s ?? "").replace(
+            /[&<>"']/g,
+            (m) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;",
+              })[m],
+          ),
+        dt = (s) => (s ? new Date(s).toLocaleString("vi-VN") : "—");
+      let services = [],
+        orders = [],
+        topups = [],
+        users = [],
+        modal;
+      const badge = (s, t = "o") => {
+        let m =
+          t === "t"
+            ? {
+                pending: ["Chờ duyệt", "warning"],
+                approved: ["Đã duyệt", "success"],
+                rejected: ["Từ chối", "danger"],
+              }
+            : {
+                pending: ["Chờ xử lý", "warning"],
+                processing: ["Đang làm", "info"],
+                completed: ["Hoàn thành", "success"],
+                cancelled: ["Đã hủy", "danger"],
+              };
+        let x = m[s] || [s, "secondary"];
+        return `<span class="badge text-bg-${x[1]}">${x[0]}</span>`;
+      };
+      async function api(u, o = {}) {
+        let r = await fetch(u, {
+            ...o,
+            headers: {
+              "Content-Type": "application/json",
+              ...(o.headers || {}),
+            },
+          }),
+          d = {};
+        try {
+          d = await r.json();
+        } catch {}
+        if (!r.ok) throw Error(d.error || "Có lỗi");
+        return d;
+      }
+      function msg(x, type = "success") {
+        $("alert").innerHTML =
+          `<div class="alert alert-${type}">${esc(x)}</div>`;
+        setTimeout(() => ($("alert").innerHTML = ""), 3500);
+      }
+      async function check() {
+        let d = await api("/api/me");
+        if (!d.user) {
+          location = "/login.html";
+          return false;
+        }
+        if (Number(d.user.is_admin) !== 1) {
+          alert("Tài khoản không có quyền admin.");
+          location = "/";
+          return false;
+        }
+        return true;
+      }
+      document.querySelectorAll(".navb").forEach(
+        (b) =>
+          (b.onclick = () => {
+            document
+              .querySelectorAll(".navb")
+              .forEach((x) => x.classList.remove("active"));
+            b.classList.add("active");
+            document
+              .querySelectorAll(".tab")
+              .forEach((x) => x.classList.remove("show"));
+            $(b.dataset.tab).classList.add("show");
+            ({
+              dash: loadStats,
+              svc: loadSvc,
+              ord: loadOrd,
+              top: loadTop,
+              usr: loadUsr,
+            })[b.dataset.tab]();
+          }),
+      );
+      async function loadStats() {
+        try {
+          let d = await api("/api/admin/stats");
+          $("uN").textContent = d.users;
+          $("uS").textContent = d.activeUsers + " hoạt động";
+          $("sN").textContent = d.services;
+          $("sS").textContent = d.activeServices + " đang hiện";
+          $("oN").textContent = d.pendingOrders;
+          $("oS").textContent =
+            d.processingOrders +
+            " đang làm · " +
+            d.completedOrders +
+            " hoàn thành";
+          $("tN").textContent = d.pendingTopups;
+          $("tS").textContent = d.approvedTopups + " đã duyệt";
+          $("rev").textContent = money(d.revenue);
+          $("dep").textContent = money(d.approvedTopupMoney);
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      function resetSvc() {
+        ["sid", "sgame", "stitle", "sdesc", "sprice", "seta"].forEach(
+          (x) => ($(x).value = ""),
+        );
+        $("sactive").checked = true;
+        $("svcTitle").textContent = "Thêm dịch vụ";
+      }
+      function editSvc(s) {
+        $("sid").value = s.id;
+        $("sgame").value = s.game;
+        $("stitle").value = s.title;
+        $("sdesc").value = s.description;
+        $("sprice").value = s.price;
+        $("seta").value = s.eta;
+        $("sactive").checked = !!Number(s.active);
+        $("svcTitle").textContent = "Sửa dịch vụ #" + s.id;
+        scrollTo({ top: 0, behavior: "smooth" });
+      }
+      async function loadSvc() {
+        try {
+          services = (await api("/api/admin/services")).services;
+          renderSvc();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      function renderSvc() {
+        $("svcBody").innerHTML =
+          services
+            .map(
+              (s) =>
+                `<tr><td>#${s.id}</td><td>${esc(s.game)}</td><td><b>${esc(s.title)}</b><div class="muted">${esc(s.description)}</div></td><td class="money">${money(s.price)}</td><td>${esc(s.eta)}</td><td>${Number(s.active) ? '<span class="badge text-bg-success">Hiện</span>' : '<span class="badge text-bg-secondary">Ẩn</span>'}</td><td><button class="btn btn-sm btn-primary" onclick='editSvc(${JSON.stringify(s)})'>Sửa</button> <button class="btn btn-sm btn-danger" onclick='delSvc(${s.id})'>Xóa</button></td></tr>`,
+            )
+            .join("") ||
+          '<tr><td colspan="7" class="muted">Chưa có dịch vụ.</td></tr>';
+      }
+      async function saveSvc() {
+        try {
+          let id = $("sid").value,
+            b = {
+              game: $("sgame").value,
+              title: $("stitle").value,
+              description: $("sdesc").value,
+              price: Number($("sprice").value),
+              eta: $("seta").value,
+              active: $("sactive").checked,
+            };
+          await api(id ? "/api/admin/services/" + id : "/api/admin/services", {
+            method: id ? "PATCH" : "POST",
+            body: JSON.stringify(b),
+          });
+          msg(id ? "Đã sửa dịch vụ" : "Đã thêm dịch vụ");
+          resetSvc();
+          await loadSvc();
+          loadStats();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      async function delSvc(id) {
+        if (!confirm("Xóa dịch vụ #" + id + "?")) return;
+        try {
+          await api("/api/admin/services/" + id, { method: "DELETE" });
+          msg("Đã xóa");
+          await loadSvc();
+          loadStats();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      async function loadOrd() {
+        try {
+          orders = (await api("/api/admin/orders")).orders;
+          renderOrd();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      function renderOrd() {
+        let q = $("oq").value.toLowerCase(),
+          a = orders.filter((o) =>
+            `${o.id} ${o.name} ${o.email} ${o.game} ${o.title} ${o.game_account}`
+              .toLowerCase()
+              .includes(q),
+          );
+        $("ordBody").innerHTML =
+          a
+            .map(
+              (o) =>
+                `<tr><td>#${o.id}</td><td><b>${esc(o.name)}</b><div class="muted">${esc(o.email)}</div></td><td>${esc(o.game)}<div class="muted">${esc(o.title)}</div></td><td>${esc(o.game_account)}${o.note ? '<div class="muted">' + esc(o.note) + "</div>" : ""}</td><td class="money">${money(o.price)}</td><td>${dt(o.created_at)}</td><td>${badge(o.status)}</td><td><select class="form-select form-select-sm" onchange="orderStatus(${o.id},this.value)" ${o.status === "cancelled" ? "disabled" : ""}><option value="pending" ${o.status === "pending" ? "selected" : ""}>Chờ xử lý</option><option value="processing" ${o.status === "processing" ? "selected" : ""}>Đang làm</option><option value="completed" ${o.status === "completed" ? "selected" : ""}>Hoàn thành</option><option value="cancelled" ${o.status === "cancelled" ? "selected" : ""}>Hủy + hoàn tiền</option></select></td></tr>`,
+            )
+            .join("") ||
+          '<tr><td colspan="8" class="muted">Không có đơn.</td></tr>';
+      }
+      async function orderStatus(id, status) {
+        try {
+          await api("/api/admin/orders/" + id, {
+            method: "PATCH",
+            body: JSON.stringify({ status }),
+          });
+          msg("Đã cập nhật đơn");
+          await loadOrd();
+          loadStats();
+        } catch (e) {
+          msg(e.message, "danger");
+          loadOrd();
+        }
+      }
+      async function loadTop() {
+        try {
+          topups = (await api("/api/admin/topups")).topups;
+          renderTop();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      function renderTop() {
+        let q = $("tq").value.toLowerCase(),
+          a = topups.filter((t) =>
+            `${t.id} ${t.name} ${t.email} ${t.serial} ${t.provider}`
+              .toLowerCase()
+              .includes(q),
+          );
+        $("topBody").innerHTML =
+          a
+            .map(
+              (t) =>
+                `<tr><td>#${t.id}</td><td><b>${esc(t.name)}</b><div class="muted">${esc(t.email)}</div></td><td>${esc(t.provider)}</td><td class="money">${money(t.denomination)}</td><td>${esc(t.serial)}</td><td>${esc(t.code)}</td><td>${dt(t.created_at)}</td><td>${badge(t.status, "t")}</td><td>${t.status === "pending" ? '<button class="btn btn-sm btn-success" onclick="topStatus(' + t.id + ',\'approved\')">Duyệt</button> <button class="btn btn-sm btn-danger" onclick="topStatus(' + t.id + ",'rejected')\">Từ chối</button>" : ""}</td></tr>`,
+            )
+            .join("") ||
+          '<tr><td colspan="9" class="muted">Không có giao dịch.</td></tr>';
+      }
+      async function topStatus(id, status) {
+        if (
+          !confirm(
+            status === "approved"
+              ? "Duyệt và cộng tiền?"
+              : "Từ chối giao dịch?",
+          )
+        )
+          return;
+        try {
+          await api("/api/admin/topups/" + id, {
+            method: "PATCH",
+            body: JSON.stringify({ status }),
+          });
+          msg(
+            status === "approved"
+              ? "Đã duyệt, tiền đã cộng vào số dư."
+              : "Đã từ chối",
+          );
+          await loadTop();
+          loadStats();
+          loadUsr();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      async function loadUsr() {
+        try {
+          users = (await api("/api/admin/users")).users;
+          renderUsr();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      function renderUsr() {
+        let q = $("uq").value.toLowerCase(),
+          a = users.filter((u) =>
+            `${u.id} ${u.name} ${u.email}`.toLowerCase().includes(q),
+          );
+        $("usrBody").innerHTML =
+          a
+            .map(
+              (u) =>
+                `<tr><td>#${u.id}</td><td><b>${esc(u.name)}</b><div class="muted">${esc(u.email)}</div></td><td class="money">${money(u.balance)}</td><td>${u.order_count}</td><td>${u.topup_count}</td><td>${Number(u.is_admin) ? '<span class="badge text-bg-primary">Admin</span>' : "User"}</td><td>${Number(u.active) ? '<span class="badge text-bg-success">Hoạt động</span>' : '<span class="badge text-bg-danger">Khóa</span>'}</td><td><button class="btn btn-sm btn-primary" onclick='editUsr(${JSON.stringify(u)})'>Sửa</button></td></tr>`,
+            )
+            .join("") ||
+          '<tr><td colspan="8" class="muted">Không có user.</td></tr>';
+      }
+      function editUsr(u) {
+        $("uid").value = u.id;
+        $("uname").value = u.name;
+        $("ubalance").value = u.balance;
+        $("upass").value = "";
+        $("uactive").checked = !!Number(u.active);
+        $("uadmin").checked = !!Number(u.is_admin);
+        modal.show();
+      }
+      async function saveUsr() {
+        try {
+          let b = {
+            name: $("uname").value,
+            balance: Number($("ubalance").value),
+            active: $("uactive").checked,
+            is_admin: $("uadmin").checked,
+          };
+          if ($("upass").value) b.password = $("upass").value;
+          await api("/api/admin/users/" + $("uid").value, {
+            method: "PATCH",
+            body: JSON.stringify(b),
+          });
+          modal.hide();
+          msg("Đã cập nhật user");
+          await loadUsr();
+          loadStats();
+        } catch (e) {
+          msg(e.message, "danger");
+        }
+      }
+      async function logout() {
+        await fetch("/api/logout", { method: "POST" });
+        location = "/login.html";
+      }
+      modal = new bootstrap.Modal($("um"));
+      (async () => {
+        if (await check()) loadStats();
+      })();
+    </script>
+  </body>
+</html>
