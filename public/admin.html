@@ -475,12 +475,11 @@
       async function check() {
         let d = await api("/api/me");
         if (!d.user) {
-          location = "/login.html";
+          location = "/admin-login.html";
           return false;
         }
         if (Number(d.user.is_admin) !== 1) {
-          alert("Tài khoản không có quyền admin.");
-          location = "/";
+          location = "/admin-login.html?error=noadmin";
           return false;
         }
         return true;
