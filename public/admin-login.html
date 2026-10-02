@@ -1,57 +1,252 @@
 <!doctype html>
 <html lang="vi">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Đăng nhập Admin — RobloxShop</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-:root{--bg:#07090d;--panel:#10151e;--line:#28303d;--accent:#7168ff;--muted:#8e97a7}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0%,#1b1940 0,#07090d 42%);color:#f5f7fb;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center;padding:20px}
-.wrap{width:min(440px,100%)}.brand{text-align:center;margin-bottom:22px}.brand-name{font-size:27px;font-weight:950}.brand-name span{color:var(--accent)}
-.badge-admin{display:inline-block;margin-top:8px;padding:6px 11px;border:1px solid #7168ff55;border-radius:999px;background:#7168ff14;color:#aaa6ff;font-size:11px;font-weight:800;letter-spacing:1.2px}
-.cardx{background:rgba(16,21,30,.94);border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:0 25px 80px #0009;backdrop-filter:blur(14px)}
-h1{font-size:25px;font-weight:900;margin:0 0 7px}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}
-label{font-size:13px;font-weight:700;margin-bottom:7px}.form-control{height:50px;background:#0a0e15;border:1px solid #303847;color:#fff;border-radius:12px}
-.form-control:focus{background:#0a0e15;color:#fff;border-color:var(--accent);box-shadow:0 0 0 4px #7168ff18}.form-control::placeholder{color:#687181}
-.pass{position:relative}.pass input{padding-right:52px}.eye{position:absolute;right:7px;top:7px;width:36px;height:36px;border:0;background:transparent;color:#929baa}
-.btn-admin{height:50px;border:0;border-radius:12px;background:linear-gradient(135deg,#7168ff,#8a63ff);color:#fff;font-weight:850;width:100%;box-shadow:0 10px 28px #7168ff25}.btn-admin:disabled{opacity:.65}
-.alertx{display:none;border:1px solid #8b3342;background:#3a151d;color:#ffb9c3;border-radius:11px;padding:11px 13px;font-size:13px;margin-bottom:16px}
-.foot{text-align:center;color:#626b79;font-size:12px;margin-top:18px}.back{display:block;text-align:center;color:#8f97a6;text-decoration:none;font-size:13px;margin-top:16px}.back:hover{color:#fff}
-</style>
-</head>
-<body>
-<main class="wrap">
-<div class="brand"><div class="brand-name">ROBLOX<span>SHOP</span></div><div class="badge-admin">ADMIN CONTROL PANEL</div></div>
-<section class="cardx">
-<h1>Đăng nhập quản trị</h1><div class="sub">Đăng nhập bằng tài khoản có quyền Admin.</div>
-<div id="error" class="alertx"></div>
-<form id="form">
-<div class="mb-3"><label for="email">Email quản trị</label><input id="email" class="form-control" type="email" autocomplete="username" placeholder="admin@example.com" required></div>
-<div class="mb-4"><label for="password">Mật khẩu</label><div class="pass"><input id="password" class="form-control" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required><button type="button" class="eye" id="eye">👁</button></div></div>
-<button class="btn-admin" id="submit" type="submit"><span id="text">Đăng nhập Admin</span></button>
-</form>
-<a class="back" href="/">← Quay về trang chủ</a>
-</section>
-<div class="foot">RobloxShop • Khu vực quản trị</div>
-</main>
-<script>
-const $=id=>document.getElementById(id);
-function showError(m){$("error").textContent=m;$("error").style.display="block"}
-$("eye").onclick=()=>{const p=$("password"),v=p.type==="text";p.type=v?"password":"text";$("eye").textContent=v?"👁":"🙈"};
-const params=new URLSearchParams(location.search);
-if(params.get("error")==="noadmin")showError("Tài khoản này không có quyền quản trị.");
-(async()=>{try{const r=await fetch("/api/me"),d=await r.json();if(d.user&&Number(d.user.is_admin)===1)location.replace("/admin")}catch{}})();
-$("form").onsubmit=async e=>{
-e.preventDefault();$("error").style.display="none";$("submit").disabled=true;$("text").textContent="Đang đăng nhập...";
-try{
-const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("email").value.trim(),password:$("password").value})});
-const d=await r.json();if(!r.ok)throw Error(d.error||"Đăng nhập thất bại.");
-const me=await fetch("/api/me"),md=await me.json();
-if(!md.user||Number(md.user.is_admin)!==1){await fetch("/api/logout",{method:"POST"});throw Error("Tài khoản này không có quyền quản trị.")}
-location.replace("/admin");
-}catch(err){showError(err.message);$("submit").disabled=false;$("text").textContent="Đăng nhập Admin"}
-};
-</script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Đăng nhập Admin — RobloxShop</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #07090d;
+        --panel: #10151e;
+        --line: #28303d;
+        --accent: #7168ff;
+        --muted: #8e97a7;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at 50% 0%, #1b1940 0, #07090d 42%);
+        color: #f5f7fb;
+        font-family: Inter, system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+      .wrap {
+        width: min(440px, 100%);
+      }
+      .brand {
+        text-align: center;
+        margin-bottom: 22px;
+      }
+      .brand-name {
+        font-size: 27px;
+        font-weight: 950;
+      }
+      .brand-name span {
+        color: var(--accent);
+      }
+      .badge-admin {
+        display: inline-block;
+        margin-top: 8px;
+        padding: 6px 11px;
+        border: 1px solid #7168ff55;
+        border-radius: 999px;
+        background: #7168ff14;
+        color: #aaa6ff;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1.2px;
+      }
+      .cardx {
+        background: rgba(16, 21, 30, 0.94);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 30px;
+        box-shadow: 0 25px 80px #0009;
+        backdrop-filter: blur(14px);
+      }
+      h1 {
+        font-size: 25px;
+        font-weight: 900;
+        margin: 0 0 7px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 14px;
+        margin-bottom: 24px;
+      }
+      label {
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 7px;
+      }
+      .form-control {
+        height: 50px;
+        background: #0a0e15;
+        border: 1px solid #303847;
+        color: #fff;
+        border-radius: 12px;
+      }
+      .form-control:focus {
+        background: #0a0e15;
+        color: #fff;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px #7168ff18;
+      }
+      .form-control::placeholder {
+        color: #687181;
+      }
+      .pass {
+        position: relative;
+      }
+      .pass input {
+        padding-right: 52px;
+      }
+      .eye {
+        position: absolute;
+        right: 7px;
+        top: 7px;
+        width: 36px;
+        height: 36px;
+        border: 0;
+        background: transparent;
+        color: #929baa;
+      }
+      .btn-admin {
+        height: 50px;
+        border: 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #7168ff, #8a63ff);
+        color: #fff;
+        font-weight: 850;
+        width: 100%;
+        box-shadow: 0 10px 28px #7168ff25;
+      }
+      .btn-admin:disabled {
+        opacity: 0.65;
+      }
+      .alertx {
+        display: none;
+        border: 1px solid #8b3342;
+        background: #3a151d;
+        color: #ffb9c3;
+        border-radius: 11px;
+        padding: 11px 13px;
+        font-size: 13px;
+        margin-bottom: 16px;
+      }
+      .foot {
+        text-align: center;
+        color: #626b79;
+        font-size: 12px;
+        margin-top: 18px;
+      }
+      .back {
+        display: block;
+        text-align: center;
+        color: #8f97a6;
+        text-decoration: none;
+        font-size: 13px;
+        margin-top: 16px;
+      }
+      .back:hover {
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="brand">
+        <div class="brand-name">ROBLOX<span>SHOP</span></div>
+        <div class="badge-admin">ADMIN CONTROL PANEL</div>
+      </div>
+      <section class="cardx">
+        <h1>Đăng nhập quản trị</h1>
+        <div class="sub">Đăng nhập bằng tài khoản có quyền Admin.</div>
+        <div id="error" class="alertx"></div>
+        <form id="form">
+          <div class="mb-3">
+            <label for="email">Email quản trị</label
+            ><input
+              id="email"
+              class="form-control"
+              type="email"
+              autocomplete="username"
+              placeholder="admin@example.com"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label for="password">Mật khẩu</label>
+            <div class="pass">
+              <input
+                id="password"
+                class="form-control"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Nhập mật khẩu"
+                required
+              /><button type="button" class="eye" id="eye">👁</button>
+            </div>
+          </div>
+          <button class="btn-admin" id="submit" type="submit">
+            <span id="text">Đăng nhập Admin</span>
+          </button>
+        </form>
+        <a class="back" href="/">← Quay về trang chủ</a>
+      </section>
+      <div class="foot">RobloxShop • Khu vực quản trị</div>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      function showError(m) {
+        $("error").textContent = m;
+        $("error").style.display = "block";
+      }
+      $("eye").onclick = () => {
+        const p = $("password"),
+          v = p.type === "text";
+        p.type = v ? "password" : "text";
+        $("eye").textContent = v ? "👁" : "🙈";
+      };
+      const params = new URLSearchParams(location.search);
+      if (params.get("error") === "noadmin")
+        showError("Tài khoản này không có quyền quản trị.");
+      (async () => {
+        try {
+          const r = await fetch("/api/me"),
+            d = await r.json();
+          if (d.user && Number(d.user.is_admin) === 1)
+            location.replace("/admin");
+        } catch {}
+      })();
+      $("form").onsubmit = async (e) => {
+        e.preventDefault();
+        $("error").style.display = "none";
+        $("submit").disabled = true;
+        $("text").textContent = "Đang đăng nhập...";
+        try {
+          const r = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: $("email").value.trim(),
+              password: $("password").value,
+            }),
+          });
+          const d = await r.json();
+          if (!r.ok) throw Error(d.error || "Đăng nhập thất bại.");
+          const me = await fetch("/api/me"),
+            md = await me.json();
+          if (!md.user || Number(md.user.is_admin) !== 1) {
+            await fetch("/api/logout", { method: "POST" });
+            throw Error("Tài khoản này không có quyền quản trị.");
+          }
+          location.replace("/admin");
+        } catch (err) {
+          showError(err.message);
+          $("submit").disabled = false;
+          $("text").textContent = "Đăng nhập Admin";
+        }
+      };
+    </script>
+  </body>
 </html>
