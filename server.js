@@ -33,7 +33,23 @@ app.get("/api/topups",login,(req,res)=>res.json({topups:db.topups.filter(t=>t.us
 // ADMIN DASHBOARD API
 // =========================
 
-app.get("/admin",(req,res)=>res.sendFile(path.join(__dirname,"public","admin.html")));
+const adminPage = (req, res, next) => {
+  const u = me(req);
+
+  if (!u) {
+    return res.redirect("/admin-login.html");
+  }
+
+  if (Number(u.is_admin) !== 1) {
+    return res.redirect("/admin-login.html?error=noadmin");
+  }
+
+  next();
+};
+
+app.get("/admin", adminPage, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
 
 app.get("/api/admin/stats",admin,(req,res)=>{
  const orders=db.orders, topups=db.topups;
