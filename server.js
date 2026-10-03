@@ -131,9 +131,7 @@ app.post("/api/setup-admin", (req, res) => {
   );
 
   if (!user) {
-    return res.status(404).json({
-      error: "Không tìm thấy tài khoản."
-    });
+    return res.status(404).json({ error: "Không tìm thấy tài khoản." });
   }
 
   user.is_admin = 1;
@@ -146,10 +144,11 @@ app.post("/api/setup-admin", (req, res) => {
   });
 });
 
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+
+app.use((req,res)=>{
+  res.sendFile(path.join(__dirname,"public","index.html"));
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT,"0.0.0.0",()=>{
   console.log(`Shop running on 0.0.0.0:${PORT}`);
-})
+});
