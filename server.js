@@ -113,13 +113,42 @@ app.patch("/api/admin/users/:id",admin,async(req,res)=>{
  if(req.body.password){const pw=String(req.body.password);if(pw.length<6)return res.status(400).json({error:"Mật khẩu mới phải có ít nhất 6 ký tự."});u.password=await bcrypt.hash(pw,12)}
  save();res.json({ok:true,user:safeUser(u)});
 });
-app.post("/api/setup-admin", (req, res) => {
-  const secret = req.headers["x-setup-secret"];
 
-  if (!secret || secret !== process.env.ADMIN_SETUP_SECRET) {
-    return res.status(403).json({ error: "Forbidden" });
+app.post("/api/setup-admin", (req, res) => {
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const setupKey = String(req.body.setupKey || "");
+
+  if (setupKey !== "ROBLOX_ADMIN_SETUP_2026") {
+    return res.status(403).json({
+      error: "Sai setup key"
+    });
   }
 
+  if (!email) {
+    return res.status(400).json({
+      error: "Thiếu email"
+    });
+  }
+
+  const user = db.users.find(
+    u => String(u.email || "").trim().toLowerCase() === email
+  );
+
+  if (!user) {
+    return res.status(404).json({
+      error: "Không tìm thấy tài khoản: " + email
+    });
+  }
+
+  user.is_admin = 1;
+  save();
+
+  res.json({
+    success: true,
+    message: "Đã cấp quyền admin",
+    email: user.email
+  });
+});
   const email = String(req.body.email || "").trim().toLowerCase();
 
   if (!email) {
@@ -142,7 +171,7 @@ app.post("/api/setup-admin", (req, res) => {
     message: "Tài khoản đã trở thành admin.",
     email: user.email
   });
-});
+
 
 
 app.use((req,res)=>{
