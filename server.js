@@ -131,7 +131,9 @@ app.post("/api/setup-admin", (req, res) => {
   );
 
   if (!user) {
-    return res.status(404).json({ error: "Không tìm thấy tài khoản." });
+    return res.status(404).json({
+      error: "Không tìm thấy tài khoản."
+    });
   }
 
   user.is_admin = 1;
@@ -144,67 +146,10 @@ app.post("/api/setup-admin", (req, res) => {
   });
 });
 
-app.post("/api/setup-admin", (req, res) => {
-  const secret = req.headers["x-setup-secret"];
-
-  if (!secret || secret !== process.env.ADMIN_SETUP_SECRET) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-
-  const email = String(req.body.email || "").trim().toLowerCase();
-
-  if (!email) {
-    return res.status(400).json({ error: "Thiếu email." });
-  }
-
-  const user = db.users.find(
-    u => String(u.email || "").toLowerCase() === email
-  );
-
-  if (!user) {
-    return res.status(404).json({ error: "Không tìm thấy tài khoản." });
-  }
-
-  user.is_admin = 1;
-  save();
-
-  res.json({
-    success: true,
-    message: "Tài khoản đã trở thành admin.",
-    email: user.email
-  });
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.use((req,res)=>{
-  res.sendFile(path.join(__dirname,"public","index.html"));
-});
-
-app.listen(PORT,"0.0.0.0",()=>{
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Shop running on 0.0.0.0:${PORT}`);
-});
-
-app.post("/api/setup-admin", (req, res) => {
-  const secret = req.headers["x-setup-secret"];
-
-  if (secret !== process.env.ADMIN_SETUP_SECRET) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  
-  const email = req.body.email;
-
-  const user = db.users.find(
-    u => u.email.toLowerCase() === email.toLowerCase()
-  );
-
-  if (!user) {
-    return res.status(404).json({ error: "Không tìm thấy tài khoản" });
-  }
-
-  user.is_admin = 1;
-  saveDB();
-
-  res.json({
-    success: true,
-    message: "Tài khoản đã trở thành admin"
-  });
-}); app.listen(PORT,"0.0.0.0",()=>console.log(`Shop running on 0.0.0.0:${PORT}`));
+})
