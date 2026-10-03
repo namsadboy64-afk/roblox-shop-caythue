@@ -149,28 +149,6 @@ app.post("/api/setup-admin", (req, res) => {
     email: user.email
   });
 });
-  const email = String(req.body.email || "").trim().toLowerCase();
-
-  if (!email) {
-    return res.status(400).json({ error: "Thiếu email." });
-  }
-
-  const user = db.users.find(
-    u => String(u.email || "").toLowerCase() === email
-  );
-
-  if (!user) {
-    return res.status(404).json({ error: "Không tìm thấy tài khoản." });
-  }
-
-  user.is_admin = 1;
-  save();
-
-  res.json({
-    success: true,
-    message: "Tài khoản đã trở thành admin.",
-    email: user.email
-  });
 
 
 
