@@ -150,7 +150,49 @@ app.post("/api/setup-admin", (req, res) => {
   });
 });
 
+app.post("/api/reset-admin-password", async (req, res) => {
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const setupKey = String(req.body.setupKey || "");
+  const newPassword = String(req.body.newPassword || "");
 
+  if (setupKey !== "ROBLOX_ADMIN_SETUP_2026") {
+    return res.status(403).json({ error: "Sai setup key" });
+  }
+
+  if (!email || !newPassword) {
+    return res.status(400).json({
+      error: "Thiếu email hoặc mật khẩu mới"
+    });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({
+      error: "Mật khẩu phải có ít nhất 6 ký tự"
+    });
+  }
+
+  const user = db.users.find(
+    u => String(u.email || "").trim().toLowerCase() === email
+  );
+
+  if (!user) {
+    return res.status(404).json({
+      error: "Không tìm thấy tài khoản"
+    });
+  }
+
+  user.password = await bcrypt.hash(newPassword, 10);
+  user.is_admin = 1;
+  user.active = 1;
+
+  save();
+
+  res.json({
+    success: true,
+    message: "Đã reset mật khẩu và cấp quyền admin",
+    email: user.email
+  });
+});
 
 app.use((req,res)=>{
   res.sendFile(path.join(__dirname,"public","index.html"));
