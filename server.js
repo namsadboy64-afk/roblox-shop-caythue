@@ -16,7 +16,35 @@ if (!db.services.length) {
     { id: 2, game: "Roblox - Chưa chọn game", title: "Cày nhiệm vụ", description: "Dịch vụ mẫu cho hệ thống. Bạn có thể đổi tên, mô tả và giá.", price: 70000, eta: "1-3 ngày", active: 1 },
     { id: 3, game: "Roblox - Chưa chọn game", title: "Gói cày theo yêu cầu", description: "Khách gửi yêu cầu riêng để shop báo giá.", price: 100000, eta: "Liên hệ", active: 1 }]; save()
 }
-(async () => { const e = process.env.ADMIN_EMAIL, p = process.env.ADMIN_PASSWORD; if (e && p && !db.users.some(u => u.email === e.trim().toLowerCase())) { db.users.push({ id: next(db.users), name: "Administrator", email: e.trim().toLowerCase(), password: await bcrypt.hash(p, 12), balance: 0, is_admin: 1, created_at: now() }); save() } })();
+(async () => {
+  const e = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const p = String(process.env.ADMIN_PASSWORD || "");
+
+  if (!e || !p) return;
+
+  let u = db.users.find(x => String(x.email || "").trim().toLowerCase() === e);
+
+  if (!u) {
+    u = {
+      id: next(db.users),
+      name: "Administrator",
+      email: e,
+      password: await bcrypt.hash(p, 12),
+      balance: 0,
+      is_admin: 1,
+      active: 1,
+      created_at: now()
+    };
+
+    db.users.push(u);
+  } else {
+    u.password = await bcrypt.hash(p, 12);
+    u.is_admin = 1;
+    u.active = 1;
+  }
+
+  save();
+})();
 app.use(express.urlencoded({ extended: true })); app.use(express.json()); app.use(session({ secret: process.env.SESSION_SECRET || "dev-only-change-me", resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 604800000 } })); app.use(express.static(path.join(__dirname, "public")));
 const me = req => { if (!req.session.userId) return null; const u = byId(req.session.userId); if (!u || u.active === 0) return null; return { id: u.id, name: u.name, email: u.email, balance: Number(u.balance) || 0, is_admin: Number(u.is_admin) || 0, active: u.active === undefined ? 1 : Number(u.active), created_at: u.created_at || null } };
 const login = (req, res, next) => me(req) ? next() : res.status(401).json({ error: "Bạn cần đăng nhập." });
