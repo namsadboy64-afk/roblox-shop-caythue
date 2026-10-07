@@ -1,51 +1,267 @@
 require("dotenv").config();
-const express = require("express"), session = require("express-session"), bcrypt = require("bcryptjs"), path = require("path"), fs = require("fs");
-const app = express(), PORT = process.env.PORT || 3000, dataDir = path.join(__dirname, "data"), dbFile = path.join(dataDir, "database.json");
-fs.mkdirSync(dataDir, { recursive: true });
-const empty = { users: [], services: [], orders: [], topups: [] };
-let db; try { db = fs.existsSync(dbFile) ? JSON.parse(fs.readFileSync(dbFile, "utf8")) : empty } catch { db = empty }
-for (const k of Object.keys(empty)) if (!Array.isArray(db[k])) db[k] = [];
-for (const u of db.users) { if (u.balance === undefined) u.balance = 0; if (u.is_admin === undefined) u.is_admin = 0; if (u.active === undefined) u.active = 1 }
-for (const o of db.orders) if (o.refunded === undefined) o.refunded = false;
-const save = () => { const t = dbFile + ".tmp"; fs.writeFileSync(t, JSON.stringify(db, null, 2)); fs.renameSync(t, dbFile) };
-const next = a => a.length ? Math.max(...a.map(x => Number(x.id) || 0)) + 1 : 1, now = () => new Date().toISOString();
-const byId = id => db.users.find(u => u.id === Number(id));
-if (!db.services.length) {
-  db.services = [
-    { id: 1, game: "Roblox - Chưa chọn game", title: "Cày level cơ bản", description: "Dịch vụ mẫu. Thay bằng game Roblox cụ thể của bạn.", price: 50000, eta: "1-2 ngày", active: 1 },
-    { id: 2, game: "Roblox - Chưa chọn game", title: "Cày nhiệm vụ", description: "Dịch vụ mẫu cho hệ thống. Bạn có thể đổi tên, mô tả và giá.", price: 70000, eta: "1-3 ngày", active: 1 },
-    { id: 3, game: "Roblox - Chưa chọn game", title: "Gói cày theo yêu cầu", description: "Khách gửi yêu cầu riêng để shop báo giá.", price: 100000, eta: "Liên hệ", active: 1 }]; save()
+
+const express = require("express");
+const session = require("express-session");
+const pgSession = require("connect-pg-simple")(session);
+const { Pool } = require("pg");
+const bcrypt = require("bcryptjs");
+const path = require("path");
+const fs = require("fs");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+if (!process.env.DATABASE_URL) {
+  console.error("DATABASE_URL is missing.");
+  process.exit(1);
 }
-(async () => {
-  const e = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
-  const p = String(process.env.ADMIN_PASSWORD || "");
 
-  if (!e || !p) return;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+});
 
-  let u = db.users.find(x => String(x.email || "").trim().toLowerCase() === e);
+const dataDir = path.join(__dirname, "data");
+const dbFile = path.join(dataDir, "database.json");
+const empty = { users: [], services: [], orders: [], topups: [] };
+let db = { users: [], services: [], orders: [], topups: [] };
+let writeQueue = Promise.resolve();
 
-  if (!u) {
-    u = {
+const now = () => new Date().toISOString();
+const next = a => a.length ? Math.max(...a.map(x => Number(x.id) || 0)) + 1 : 1;
+const byId = id => db.users.find(u => u.id === Number(id));
+
+async function initSchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      balance BIGINT NOT NULL DEFAULT 0,
+      is_admin INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS services (
+      id INTEGER PRIMARY KEY,
+      game TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      price BIGINT NOT NULL DEFAULT 0,
+      eta TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      service_id INTEGER NOT NULL REFERENCES services(id),
+      game_account TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      price BIGINT NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      refunded BOOLEAN NOT NULL DEFAULT FALSE,
+      refunded_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS topups (
+      id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      provider TEXT NOT NULL,
+      denomination BIGINT NOT NULL,
+      serial TEXT NOT NULL,
+      code TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      approved_at TIMESTAMPTZ,
+      approved_by INTEGER,
+      updated_at TIMESTAMPTZ
+    );
+  `);
+}
+
+function normalizeLegacyDb(old) {
+  const out = { users: [], services: [], orders: [], topups: [] };
+  for (const k of Object.keys(out)) if (Array.isArray(old?.[k])) out[k] = old[k];
+
+  for (const u of out.users) {
+    if (u.balance === undefined) u.balance = 0;
+    if (u.is_admin === undefined) u.is_admin = 0;
+    if (u.active === undefined) u.active = 1;
+  }
+  for (const o of out.orders) if (o.refunded === undefined) o.refunded = false;
+  return out;
+}
+
+async function loadFromPostgres() {
+  const [users, services, orders, topups] = await Promise.all([
+    pool.query("SELECT * FROM users ORDER BY id"),
+    pool.query("SELECT * FROM services ORDER BY id"),
+    pool.query("SELECT * FROM orders ORDER BY id"),
+    pool.query("SELECT * FROM topups ORDER BY id")
+  ]);
+
+  db = {
+    users: users.rows.map(u => ({ ...u, id: Number(u.id), balance: Number(u.balance), is_admin: Number(u.is_admin), active: Number(u.active) })),
+    services: services.rows.map(s => ({ ...s, id: Number(s.id), price: Number(s.price), active: Number(s.active) })),
+    orders: orders.rows.map(o => ({ ...o, id: Number(o.id), user_id: Number(o.user_id), service_id: Number(o.service_id), price: Number(o.price), refunded: Boolean(o.refunded) })),
+    topups: topups.rows.map(t => ({ ...t, id: Number(t.id), user_id: Number(t.user_id), denomination: Number(t.denomination) }))
+  };
+}
+
+async function importLegacyJsonIfPostgresEmpty() {
+  const count = await pool.query("SELECT COUNT(*)::int AS n FROM users");
+  if (count.rows[0].n !== 0) return false;
+  if (!fs.existsSync(dbFile)) return false;
+
+  try {
+    const old = normalizeLegacyDb(JSON.parse(fs.readFileSync(dbFile, "utf8")));
+    if (!old.users.length && !old.services.length) return false;
+
+    // Hash any plaintext legacy passwords during migration.
+    for (const u of old.users) {
+      const p = String(u.password || "");
+      if (!p.startsWith("$2a$") && !p.startsWith("$2b$") && !p.startsWith("$2y$")) {
+        u.password = await bcrypt.hash(p, 12);
+      }
+    }
+
+    db = old;
+    await persistDbNow();
+    console.log("Migrated data/database.json to PostgreSQL.");
+    return true;
+  } catch (e) {
+    console.error("Legacy migration failed:", e);
+    throw e;
+  }
+}
+
+async function persistDbNow() {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM topups");
+    await client.query("DELETE FROM orders");
+    await client.query("DELETE FROM services");
+    await client.query("DELETE FROM users");
+
+    for (const u of db.users) {
+      await client.query(
+        `INSERT INTO users(id,name,email,password,balance,is_admin,active,created_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [Number(u.id), String(u.name || ""), String(u.email || "").toLowerCase(), String(u.password || ""),
+         Number(u.balance) || 0, Number(u.is_admin) ? 1 : 0, u.active === 0 ? 0 : 1,
+         u.created_at ? new Date(u.created_at) : new Date()]
+      );
+    }
+
+    for (const s of db.services) {
+      await client.query(
+        `INSERT INTO services(id,game,title,description,price,eta,active)
+         VALUES($1,$2,$3,$4,$5,$6,$7)`,
+        [Number(s.id), String(s.game || ""), String(s.title || ""), String(s.description || ""),
+         Number(s.price) || 0, String(s.eta || ""), s.active === 0 ? 0 : 1]
+      );
+    }
+
+    for (const o of db.orders) {
+      await client.query(
+        `INSERT INTO orders(id,user_id,service_id,game_account,note,price,status,created_at,refunded,refunded_at,updated_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [Number(o.id), Number(o.user_id), Number(o.service_id), String(o.game_account || ""),
+         String(o.note || ""), Number(o.price) || 0, String(o.status || "pending"),
+         o.created_at ? new Date(o.created_at) : new Date(), Boolean(o.refunded),
+         o.refunded_at ? new Date(o.refunded_at) : null, o.updated_at ? new Date(o.updated_at) : null]
+      );
+    }
+
+    for (const t of db.topups) {
+      await client.query(
+        `INSERT INTO topups(id,user_id,provider,denomination,serial,code,status,created_at,approved_at,approved_by,updated_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [Number(t.id), Number(t.user_id), String(t.provider || ""), Number(t.denomination) || 0,
+         String(t.serial || ""), String(t.code || ""), String(t.status || "pending"),
+         t.created_at ? new Date(t.created_at) : new Date(),
+         t.approved_at ? new Date(t.approved_at) : null,
+         t.approved_by ? Number(t.approved_by) : null,
+         t.updated_at ? new Date(t.updated_at) : null]
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// Kept as the same function name used by the existing routes.
+// Writes are serialized so rapid admin/user updates do not overlap.
+function save() {
+  writeQueue = writeQueue.then(() => persistDbNow()).catch(err => console.error("PostgreSQL save failed:", err));
+  return writeQueue;
+}
+
+async function ensureAdminFromEnv() {
+  const email = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const password = String(process.env.ADMIN_PASSWORD || "");
+  if (!email) return;
+
+  const found = db.users.find(u => String(u.email || "").trim().toLowerCase() === email);
+  if (!found) {
+    if (!password) return;
+    db.users.push({
       id: next(db.users),
       name: "Administrator",
-      email: e,
-      password: await bcrypt.hash(p, 12),
+      email,
+      password: await bcrypt.hash(password, 12),
       balance: 0,
       is_admin: 1,
       active: 1,
       created_at: now()
-    };
-
-    db.users.push(u);
+    });
+    await save();
   } else {
-    u.password = await bcrypt.hash(p, 12);
-    u.is_admin = 1;
-    u.active = 1;
+    found.is_admin = 1;
+    found.active = 1;
+    // Do NOT overwrite an existing password on every Render restart.
+    await save();
   }
+}
 
-  save();
-})();
-app.use(express.urlencoded({ extended: true })); app.use(express.json()); app.use(session({ secret: process.env.SESSION_SECRET || "dev-only-change-me", resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 604800000 } })); app.use(express.static(path.join(__dirname, "public")));
+async function seedServicesIfEmpty() {
+  if (db.services.length) return;
+  db.services = [
+    { id: 1, game: "Roblox - Chưa chọn game", title: "Cày level cơ bản", description: "Dịch vụ mẫu. Thay bằng game Roblox cụ thể của bạn.", price: 50000, eta: "1-2 ngày", active: 1 },
+    { id: 2, game: "Roblox - Chưa chọn game", title: "Cày nhiệm vụ", description: "Dịch vụ mẫu cho hệ thống. Bạn có thể đổi tên, mô tả và giá.", price: 70000, eta: "1-3 ngày", active: 1 },
+    { id: 3, game: "Roblox - Chưa chọn game", title: "Gói cày theo yêu cầu", description: "Khách gửi yêu cầu riêng để shop báo giá.", price: 100000, eta: "Liên hệ", active: 1 }
+  ];
+  await save();
+}
+
+async function initialize() {
+  await initSchema();
+  await importLegacyJsonIfPostgresEmpty();
+  await loadFromPostgres();
+  await ensureAdminFromEnv();
+  await loadFromPostgres();
+  await seedServicesIfEmpty();
+  await loadFromPostgres();
+}
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(session({
+  store: new pgSession({ pool, tableName: "user_sessions", createTableIfMissing: true }),
+  secret: process.env.SESSION_SECRET || "dev-only-change-me",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 604800000 }
+}));
+app.use(express.static(path.join(__dirname, "public")));
 const me = req => { if (!req.session.userId) return null; const u = byId(req.session.userId); if (!u || u.active === 0) return null; return { id: u.id, name: u.name, email: u.email, balance: Number(u.balance) || 0, is_admin: Number(u.is_admin) || 0, active: u.active === undefined ? 1 : Number(u.active), created_at: u.created_at || null } };
 const login = (req, res, next) => me(req) ? next() : res.status(401).json({ error: "Bạn cần đăng nhập." });
 const admin = (req, res, next) => { const u = me(req); u && Number(u.is_admin) === 1 ? next() : res.status(403).json({ error: "Không có quyền admin." }) };
@@ -144,90 +360,16 @@ app.patch("/api/admin/users/:id", admin, async (req, res) => {
   save(); res.json({ ok: true, user: safeUser(u) });
 });
 
-app.post("/api/setup-admin", (req, res) => {
-  const email = String(req.body.email || "").trim().toLowerCase();
-  const setupKey = String(req.body.setupKey || "");
-
-  if (setupKey !== "ROBLOX_ADMIN_SETUP_2026") {
-    return res.status(403).json({
-      error: "Sai setup key"
-    });
-  }
-
-  if (!email) {
-    return res.status(400).json({
-      error: "Thiếu email"
-    });
-  }
-
-  const user = db.users.find(
-    u => String(u.email || "").trim().toLowerCase() === email
-  );
-
-  if (!user) {
-    return res.status(404).json({
-      error: "Không tìm thấy tài khoản: " + email
-    });
-  }
-
-  user.is_admin = 1;
-  save();
-
-  res.json({
-    success: true,
-    message: "Đã cấp quyền admin",
-    email: user.email
-  });
-});
-
-app.post("/api/reset-admin-password", async (req, res) => {
-  const email = String(req.body.email || "").trim().toLowerCase();
-  const setupKey = String(req.body.setupKey || "");
-  const newPassword = String(req.body.newPassword || "");
-
-  if (setupKey !== "ROBLOX_ADMIN_SETUP_2026") {
-    return res.status(403).json({ error: "Sai setup key" });
-  }
-
-  if (!email || !newPassword) {
-    return res.status(400).json({
-      error: "Thiếu email hoặc mật khẩu mới"
-    });
-  }
-
-  if (newPassword.length < 6) {
-    return res.status(400).json({
-      error: "Mật khẩu phải có ít nhất 6 ký tự"
-    });
-  }
-
-  const user = db.users.find(
-    u => String(u.email || "").trim().toLowerCase() === email
-  );
-
-  if (!user) {
-    return res.status(404).json({
-      error: "Không tìm thấy tài khoản"
-    });
-  }
-
-  user.password = await bcrypt.hash(newPassword, 10);
-  user.is_admin = 1;
-  user.active = 1;
-
-  save();
-
-  res.json({
-    success: true,
-    message: "Đã reset mật khẩu và cấp quyền admin",
-    email: user.email
-  });
-});
 
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Shop running on 0.0.0.0:${PORT}`);
+initialize().then(() => {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Shop running on 0.0.0.0:${PORT}`);
+  });
+}).catch(err => {
+  console.error("Database startup failed:", err);
+  process.exit(1);
 });
